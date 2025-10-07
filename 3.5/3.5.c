@@ -207,6 +207,45 @@ double log2_custom(double x) {
     return result;
 }
 
+// Инфиксный обход (слева направо)
+void inorder(struct Node* root) {
+    if (root != NULL) {
+        inorder(root->left);
+        printf("%d ", root->key);
+        inorder(root->right);
+    }
+}
+
+// Префиксный обход (корень, левое, правое)
+void preorder(struct Node* root) {
+    if (root != NULL) {
+        printf("%d ", root->key);
+        preorder(root->left);
+        preorder(root->right);
+    }
+}
+
+// Постфиксный обход (левое, правое, корень)
+void postorder(struct Node* root) {
+    if (root != NULL) {
+        postorder(root->left);
+        postorder(root->right);
+        printf("%d ", root->key);
+    }
+}
+
+// Простая визуализация дерева
+void printTree(struct Node* root, int level) {
+    if (root == NULL) return;
+    
+    printTree(root->right, level + 1);
+    
+    for (int i = 0; i < level; i++) printf("    ");
+    printf("%d(%d)\n", root->key, root->balance);
+    
+    printTree(root->left, level + 1);
+}
+
 // Освобождение памяти
 void freeTree(struct Node* root) {
     if (root == NULL) return;
@@ -243,6 +282,27 @@ int main() {
     
     printf("Уникальных ключей сгенерировано: %d\n\n", unique_count);
 
+    // Вывод обходов дерева
+    printf("ОБХОДЫ AVL-ДЕРЕВА:\n");
+    printf("==================\n");
+    
+    printf("Инфиксный обход (слева направо):\n");
+    inorder(root);
+    printf("\n\n");
+    
+    printf("Префиксный обход (корень -> левое -> правое):\n");
+    preorder(root);
+    printf("\n\n");
+    
+    printf("Постфиксный обход (левое -> правое -> корень):\n");
+    postorder(root);
+    printf("\n\n");
+    
+    printf("Визуализация структуры AVL-дерева:\n");
+    printf("(числа в скобках - баланс-факторы)\n");
+    printTree(root, 0);
+    printf("\n");
+
     // Вычисляем характеристики AVL-дерева
     int size_avl = getSize(root);
     int checksum_avl = getChecksum(root);
@@ -267,7 +327,7 @@ int main() {
     double avg_depth_idp = (size_idp <= 1) ? 0.0 : log2_custom(size_idp) - 1;
 
     // Вывод таблицы
-    printf("Таблица сравнения характеристик:\n");
+    printf("ТАБЛИЦА СРАВНЕНИЯ ХАРАКТЕРИСТИК:\n");
     printf("+--------+----------+--------------+---------+-------------+\n");
     printf("| Дерево | Размер   | Контр. Сумма | Высота  | Средн.глуб. |\n");
     printf("+--------+----------+--------------+---------+-------------+\n");
@@ -275,12 +335,13 @@ int main() {
     printf("| AVL    | %-8d | %-12d | %-7d | %-11.2f |\n", size_avl, checksum_avl, height_avl, avg_depth_avl);
     printf("+--------+----------+--------------+---------+-------------+\n");
 
-    printf("\nПримечания:\n");
+    printf("\nПРИМЕЧАНИЯ:\n");
     printf("- Используются %d УНИКАЛЬНЫХ ключей (без дубликатов)\n", size_avl);
-    printf("- Размеры ИСДП и AVL теперь одинаковы: %d узлов\n", size_avl);
+    printf("- Размеры ИСДП и AVL одинаковы: %d узлов\n", size_avl);
     printf("- Контрольные суммы одинаковы: %d\n", checksum_avl);
     printf("- ИСДП — идеальное сбалансированное дерево (теоретический минимум высоты)\n");
     printf("- AVL — практически сбалансированное дерево\n");
+    printf("- Инфиксный обход выводит ключи в отсортированном порядке\n");
 
     freeTree(root);
     return 0;
