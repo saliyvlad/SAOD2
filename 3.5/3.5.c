@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <math.h>
 
 // Структура узла AVL-дерева
 struct Node {
     int key;
     struct Node *left, *right;
-    int height; // высота поддерева
+    int balance; // баланс-фактор
 };
 
 // Создание нового узла
@@ -15,96 +14,146 @@ struct Node* newNode(int key) {
     struct Node* node = (struct Node*)malloc(sizeof(struct Node));
     node->key = key;
     node->left = node->right = NULL;
-    node->height = 1;
+    node->balance = 0;
     return node;
 }
 
-// Получить высоту узла (если NULL — 0)
-int getHeight(struct Node* node) {
-    if (node == NULL) return 0;
-    return node->height;
+// LL-поворот (как в псевдокоде)
+struct Node* rotateLL(struct Node* p) {
+    struct Node* q = p->left;
+    q->balance = 0;
+    p->balance = 0;
+    p->left = q->right;
+    q->right = p;
+    p = q;
+    return p;
 }
 
-// Обновить высоту узла
-void updateHeight(struct Node* node) {
-    if (node != NULL)
-        node->height = 1 + (getHeight(node->left) > getHeight(node->right) ? 
-                            getHeight(node->left) : getHeight(node->right));
+// RR-поворот (как в псевдокоде)
+struct Node* rotateRR(struct Node* p) {
+    struct Node* q = p->right;
+    q->balance = 0;
+    p->balance = 0;
+    p->right = q->left;
+    q->left = p;
+    p = q;
+    return p;
 }
 
-// Получить баланс фактор
-int getBalance(struct Node* node) {
-    if (node == NULL) return 0;
-    return getHeight(node->left) - getHeight(node->right);
+// LR-поворот (как в псевдокоде)
+struct Node* rotateLR(struct Node* p) {
+    struct Node* q = p->left;
+    struct Node* r = q->right;
+    
+    if (r->balance < 0) 
+        p->balance = +1;
+    else 
+        p->balance = 0;
+    
+    if (r->balance > 0) 
+        q->balance = -1;
+    else 
+        q->balance = 0;
+    
+    r->balance = 0;
+    p->left = r->right;
+    q->right = r->left;
+    r->left = q;
+    r->right = p;
+    p = r;
+    
+    return p;
 }
 
-// Поворот вправо
-struct Node* rightRotate(struct Node* y) {
-    struct Node* x = y->left;
-    struct Node* T2 = x->right;
-
-    x->right = y;
-    y->left = T2;
-
-    updateHeight(y);
-    updateHeight(x);
-
-    return x;
+// RL-поворот (аналогично LR)
+struct Node* rotateRL(struct Node* p) {
+    struct Node* q = p->right;
+    struct Node* r = q->left;
+    
+    if (r->balance > 0) 
+        p->balance = -1;
+    else 
+        p->balance = 0;
+    
+    if (r->balance < 0) 
+        q->balance = +1;
+    else 
+        q->balance = 0;
+    
+    r->balance = 0;
+    p->right = r->left;
+    q->left = r->right;
+    r->right = q;
+    r->left = p;
+    p = r;
+    
+    return p;
 }
 
-// Поворот влево
-struct Node* leftRotate(struct Node* x) {
-    struct Node* y = x->right;
-    struct Node* T2 = y->left;
-
-    y->left = x;
-    x->right = T2;
-
-    updateHeight(x);
-    updateHeight(y);
-
-    return y;
-}
-
-// Вставка с балансировкой (основная функция задания №2)
-struct Node* insertAVL(struct Node* node, int key) {
-    if (node == NULL) return newNode(key);
-
-    if (key < node->key)
-        node->left = insertAVL(node->left, key);
-    else if (key > node->key)
-        node->right = insertAVL(node->right, key);
-    else
-        return node; // дубликаты не разрешены
-
-    updateHeight(node);
-
-    int balance = getBalance(node);
-
-    // Левый левый случай
-    if (balance > 1 && key < node->left->key)
-        return rightRotate(node);
-
-    // Правый правый случай
-    if (balance < -1 && key > node->right->key)
-        return leftRotate(node);
-
-    // Левый правый случай
-    if (balance > 1 && key > node->left->key) {
-        node->left = leftRotate(node->left);
-        return rightRotate(node);
+// Вставка в AVL-дерево с балансировкой
+struct Node* insertAVL(struct Node* p, int key, int* heightChanged) {
+    if (p == NULL) {
+        *heightChanged = 1;
+        return newNode(key);
     }
-
-    // Правый левый случай
-    if (balance < -1 && key < node->right->key) {
-        node->right = rightRotate(node->right);
-        return leftRotate(node);
+    
+    if (key < p->key) {
+        p->left = insertAVL(p->left, key, heightChanged);
+        if (*heightChanged) {
+            switch (p->balance) {
+                case +1: // было перевес слева
+                    p->balance = 0;
+                    *heightChanged = 0;
+                    break;
+                case 0: // было сбалансировано
+                    p->balance = -1;
+                    break;
+                case -1: // было перевес справа → нужна балансировка
+                    if (p->left->balance == -1) {
+                        p = rotateLL(p); // LL-поворот
+                    } else {
+                        p = rotateLR(p); // LR-поворот
+                    }
+                    *heightChanged = 0;
+                    break;
+            }
+        }
+    } else if (key > p->key) {
+        p->right = insertAVL(p->right, key, heightChanged);
+        if (*heightChanged) {
+            switch (p->balance) {
+                case -1: // было перевес справа
+                    p->balance = 0;
+                    *heightChanged = 0;
+                    break;
+                case 0: // было сбалансировано
+                    p->balance = +1;
+                    break;
+                case +1: // было перевес слева → нужна балансировка
+                    if (p->right->balance == +1) {
+                        p = rotateRR(p); // RR-поворот
+                    } else {
+                        p = rotateRL(p); // RL-поворот
+                    }
+                    *heightChanged = 0;
+                    break;
+            }
+        }
+    } else {
+        // Дубликаты не разрешены
+        *heightChanged = 0;
     }
-
-    return node;
+    
+    return p;
 }
 
-// Инфиксный обход (слева направо) — задание №3
+// Обертка для вставки
+struct Node* insert(struct Node* root, int key) {
+    int heightChanged = 0;
+    return insertAVL(root, key, &heightChanged);
+}
+
+// Инфиксный обход (слева направо)
 void inorder(struct Node* root) {
     if (root != NULL) {
         inorder(root->left);
@@ -126,12 +175,14 @@ int getChecksum(struct Node* root) {
 }
 
 // Вычисление высоты дерева
-int getHeightTree(struct Node* root) {
+int getHeight(struct Node* root) {
     if (root == NULL) return 0;
-    return root->height;
+    int left = getHeight(root->left);
+    int right = getHeight(root->right);
+    return (left > right ? left : right) + 1;
 }
 
-// Вычисление средней глубины (среднего расстояния от корня до листа)
+// Вычисление средней глубины
 typedef struct {
     long totalDepth;
     int leafCount;
@@ -140,7 +191,7 @@ typedef struct {
 void calculateAverageDepth(struct Node* root, int depth, DepthStats* stats) {
     if (root == NULL) return;
 
-    if (root->left == NULL && root->right == NULL) { // лист
+    if (root->left == NULL && root->right == NULL) {
         stats->totalDepth += depth;
         stats->leafCount++;
     }
@@ -157,12 +208,36 @@ double getAverageDepth(struct Node* root) {
     return (double)stats.totalDepth / stats.leafCount;
 }
 
+// Функция для вычисления логарифма по основанию 2
+double log2_custom(double x) {
+    if (x <= 0) return 0;
+    double result = 0;
+    double temp = x;
+    while (temp >= 2) {
+        temp /= 2;
+        result++;
+    }
+    return result;
+}
+
 // Освобождение памяти
 void freeTree(struct Node* root) {
     if (root == NULL) return;
     freeTree(root->left);
     freeTree(root->right);
     free(root);
+}
+
+// Функция для печати дерева (простая визуализация)
+void printTree(struct Node* root, int level) {
+    if (root == NULL) return;
+    
+    printTree(root->right, level + 1);
+    
+    for (int i = 0; i < level; i++) printf("    ");
+    printf("%d(%d)\n", root->key, root->balance);
+    
+    printTree(root->left, level + 1);
 }
 
 // Главная функция
@@ -175,24 +250,29 @@ int main() {
     printf("Строим AVL-дерево из %d случайных чисел (от 1 до 500):\n", n);
     for (int i = 0; i < n; i++) {
         int val = rand() % 500 + 1;
-        root = insertAVL(root, val);
+        root = insert(root, val);
     }
 
     printf("\nОбход слева направо (инфиксный): ");
     inorder(root);
     printf("\n\n");
 
+    printf("Структура дерева (корень слева):\n");
+    printTree(root, 0);
+    printf("\n");
+
     // Вычисляем характеристики AVL-дерева
     int size_avl = getSize(root);
     int checksum_avl = getChecksum(root);
-    int height_avl = getHeightTree(root);
+    int height_avl = getHeight(root);
     double avg_depth_avl = getAverageDepth(root);
 
-    // Характеристики ИСДП (идеальное сбалансированное дерево)
+    // Характеристики ИСДП
     int size_idp = n;
-    int checksum_idp = checksum_avl; // контрольная сумма совпадает, если ключи одинаковы
-    int height_idp = (int)floor(log2(n)); // минимальная возможная высота
-    // Уточним: для n=100, полное дерево высоты 6 содержит 64–127 узлов → высота = 6
+    int checksum_idp = checksum_avl;
+    int height_idp = (int)log2_custom(n);
+    
+    // Уточняем высоту для ИСДП
     if (n > 63) height_idp = 6;
     else if (n > 31) height_idp = 5;
     else if (n > 15) height_idp = 4;
@@ -201,14 +281,7 @@ int main() {
     else if (n > 1) height_idp = 1;
     else height_idp = 0;
 
-    // Средняя глубина для ИСДП — оценка
-    double avg_depth_idp = 0.0;
-    if (n <= 1) avg_depth_idp = 0.0;
-    else {
-        // Приблизительная формула: средняя глубина ≈ log2(n) - 1
-        avg_depth_idp = log2(n) - 1;
-        // Можно вычислить точнее, но для сравнения хватит приближения
-    }
+    double avg_depth_idp = (n <= 1) ? 0.0 : log2_custom(n) - 1;
 
     // Вывод таблицы
     printf("Таблица сравнения характеристик:\n");
@@ -219,8 +292,9 @@ int main() {
     printf("| AVL    | %-8d | %-12d | %-7d | %-11.2f |\n", size_avl, checksum_avl, height_avl, avg_depth_avl);
     printf("+--------+----------+--------------+---------+-------------+\n");
 
-    printf("\nПримечание: Контрольная сумма совпадает, так как ключи одинаковы.\n");
-    printf("ИСДП — идеальное сбалансированное дерево (минимальная высота).\n");
+    printf("\nПримечание:\n");
+    printf("- ИСДП — идеальное сбалансированное дерево\n");
+    printf("- Числа в скобках в визуализации дерева — баланс-факторы\n");
 
     freeTree(root);
     return 0;
